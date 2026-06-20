@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Comment Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #1c2340;
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      color: #c5d0f0;
+    }
+
+    .board-tabs {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .board-tab {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.75);
+      padding: 5px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .board-tab:hover { background: rgba(255,255,255,0.18); color: white; }
+    .board-tab.active { background: #4c7aef; border-color: #4c7aef; color: white; }
+
+    .spacer { flex: 1; }
+
+    .clock {
+      font-size: 13px;
+      color: rgba(255,255,255,0.5);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* ── Main layout ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Members panel ── */
+    .members-panel {
+      width: 260px;
+      flex-shrink: 0;
+      background: white;
+      border-right: 1px solid #e2e6f0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-label {
+      padding: 12px 14px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #9aa0b8;
+      border-bottom: 1px solid #f0f2f8;
+      flex-shrink: 0;
+    }
+
+    .members-list {
+      padding: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      align-content: flex-start;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .member-btn {
+      background: #eef2ff;
+      border: 1.5px solid #c7d4f8;
+      color: #2d4db5;
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 500;
+      transition: all 0.12s;
+      user-select: none;
+    }
+    .member-btn:hover:not(.queued):not(.spoke) {
+      background: #4c7aef;
+      border-color: #4c7aef;
+      color: white;
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(76,122,239,0.3);
+    }
+    .member-btn.queued {
+      background: #fff8e6;
+      border-color: #f0b429;
+      color: #a05800;
+      cursor: default;
+    }
+    .member-btn.spoke {
+      background: #f4f4f4;
+      border-color: #ddd;
+      color: #bbb;
+      text-decoration: line-through;
+      cursor: default;
+    }
+
+    /* ── Queue panel ── */
+    .queue-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f5f7fb;
+    }
+
+    .queue-topbar {
+      background: white;
+      border-bottom: 1px solid #e2e6f0;
+      padding: 11px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .queue-topbar-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #9aa0b8;
+      flex: 1;
+    }
+
+    .queue-count {
+      font-size: 12px;
+      color: #9aa0b8;
+    }
+
+    .clear-btn {
+      background: none;
+      border: 1px solid #ddd;
+      color: #aaa;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 11.5px;
+      transition: all 0.12s;
+    }
+    .clear-btn:hover { border-color: #e57373; color: #e57373; }
+
+    .queue-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .queue-empty {
+      text-align: center;
+      color: #c0c5d8;
+      font-size: 14px;
+      line-height: 1.7;
+      margin-top: 50px;
+    }
+
+    .queue-item {
+      background: white;
+      border: 1.5px solid #e2e8f8;
+      border-radius: 10px;
+      padding: 11px 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      transition: border-color 0.15s;
+    }
+    .queue-item.next {
+      border-color: #4c7aef;
+      background: #f0f5ff;
+    }
+
+    .q-num {
+      width: 27px;
+      height: 27px;
+      border-radius: 50%;
+      background: #d0daff;
+      color: #2d4db5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .queue-item.next .q-num {
+      background: #4c7aef;
+      color: white;
+    }
+
+    .q-info { flex: 1; min-width: 0; }
+
+    .q-name {
+      font-size: 14.5px;
+      font-weight: 600;
+      color: #1a1a2e;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .queue-item.next .q-name { color: #2d4db5; }
+
+    .q-meta {
+      font-size: 11px;
+      color: #aaa;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+    .queue-item.next .q-meta { color: #7a9aef; }
+
+    .q-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .q-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #e4e8f0;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.1s;
+      color: #666;
+    }
+    .q-btn:hover:not(:disabled) { background: #f0f2f8; border-color: #c5cce0; }
+    .q-btn:disabled { opacity: 0.25; cursor: default; }
+
+    .q-btn.done {
+      border-color: #b8e0c0;
+      background: #edfaf2;
+      color: #2d8044;
+      font-size: 15px;
+    }
+    .q-btn.done:hover { background: #2d8044; color: white; border-color: #2d8044; }
+
+    .q-btn.remove {
+      color: #c0675a;
+    }
+    .q-btn.remove:hover { background: #fff0ee; border-color: #e07a6e; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d0d4e0; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Comment Tracker</h1>
+  <div class="board-tabs" id="boardTabs"></div>
+  <div class="spacer"></div>
+  <div class="clock" id="clock"></div>
+</header>
+
+<div class="main">
+  <div class="members-panel">
+    <div class="panel-label">Members — click to queue</div>
+    <div class="members-list" id="membersList"></div>
+  </div>
+  <div class="queue-panel">
+    <div class="queue-topbar">
+      <span class="queue-topbar-label">Speaker Queue</span>
+      <span class="queue-count" id="queueCount"></span>
+      <button class="clear-btn" onclick="clearQueue()">Clear all</button>
+    </div>
+    <div class="queue-list" id="queueList"></div>
+  </div>
+</div>
+
+<script>
+  const BOARDS = {
+    'HY':       ['Mari','Sanna','Juha','Hanna','Minna','Anne','Thomas','Teemu','Aku','Sari','AnneP','Kai','Hanna','Jouni'],
+    'QMill':    ['Jussi','Pirkka','Maria','Pekka','Hannu','Mikko','Ville'],
+    'SemiQon':  ['Jussi','Patrik','Kuan','Himadri','Janne','Alberto'],
+    'Deetee':   ['Henrik','Jyrki','Marion','Richard','Amy','Hannu','Matti'],
+    'TechBoard':['Annika','Petri','Lauri','Tuula','Markku','Riitta','Eero'],
+  };
+
+  let currentBoard = Object.keys(BOARDS)[0];
+  let queue = [];       // { uid, name, idx, timeStr }
+  let spokeSet = new Set();  // Set of member idx who have spoken
+  let inQueueSet = new Set(); // Set of member idx currently in queue
+  let uidCounter = 0;
+
+  // ── Clock ──────────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString('fi-FI');
+  }
+  setInterval(updateClock, 500);
+  updateClock();
+
+  // ── Board selection ─────────────────────────────────────────────────
+  function renderTabs() {
+    const el = document.getElementById('boardTabs');
+    el.innerHTML = '';
+    Object.keys(BOARDS).forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'board-tab' + (name === currentBoard ? ' active' : '');
+      btn.textContent = name;
+      btn.onclick = () => selectBoard(name);
+      el.appendChild(btn);
+    });
+  }
+
+  function selectBoard(name) {
+    currentBoard = name;
+    queue = [];
+    spokeSet = new Set();
+    inQueueSet = new Set();
+    uidCounter = 0;
+    render();
+  }
+
+  // ── Members ─────────────────────────────────────────────────────────
+  function renderMembers() {
+    const el = document.getElementById('membersList');
+    el.innerHTML = '';
+    BOARDS[currentBoard].forEach((name, idx) => {
+      const isQueued = inQueueSet.has(idx);
+      const hasspoke = spokeSet.has(idx);
+      const btn = document.createElement('button');
+      btn.className = 'member-btn' + (isQueued ? ' queued' : hasspoke ? ' spoke' : '');
+      btn.textContent = name;
+      btn.title = isQueued ? 'In queue' : hasspoke ? 'Already spoke' : 'Add to queue';
+      if (!isQueued && !hasspoke) {
+        btn.onclick = () => addToQueue(name, idx);
+      }
+      el.appendChild(btn);
+    });
+  }
+
+  function addToQueue(name, idx) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('fi-FI', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    queue.push({ uid: ++uidCounter, name, idx, timeStr });
+    inQueueSet.add(idx);
+    render();
+  }
+
+  // ── Queue ────────────────────────────────────────────────────────────
+  function renderQueue() {
+    const el = document.getElementById('queueList');
+    const countEl = document.getElementById('queueCount');
+
+    if (queue.length === 0) {
+      el.innerHTML = '<div class="queue-empty">Queue is empty.<br>Click a name on the left to add them.</div>';
+      countEl.textContent = '';
+      return;
+    }
+
+    countEl.textContent = queue.length + ' waiting';
+    el.innerHTML = '';
+
+    queue.forEach((item, pos) => {
+      const isNext = pos === 0;
+      const div = document.createElement('div');
+      div.className = 'queue-item' + (isNext ? ' next' : '');
+
+      const num = document.createElement('div');
+      num.className = 'q-num';
+      num.textContent = pos + 1;
+
+      const info = document.createElement('div');
+      info.className = 'q-info';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'q-name';
+      nameDiv.textContent = item.name;
+
+      const meta = document.createElement('div');
+      meta.className = 'q-meta';
+      meta.textContent = (isNext ? 'Next to speak · ' : '') + 'Queued ' + item.timeStr;
+
+      info.appendChild(nameDiv);
+      info.appendChild(meta);
+
+      const actions = document.createElement('div');
+      actions.className = 'q-actions';
+
+      const upBtn = makeBtn('↑', 'Move up', false, pos === 0, () => move(pos, -1));
+      const dnBtn = makeBtn('↓', 'Move down', false, pos === queue.length - 1, () => move(pos, 1));
+      const doneBtn = makeBtn('✓', 'Done speaking — remove and mark as spoke', true, false, () => markDone(pos));
+      const rmBtn = makeBtn('✕', 'Remove from queue', false, false, () => remove(pos));
+      rmBtn.classList.add('remove');
+
+      actions.appendChild(upBtn);
+      actions.appendChild(dnBtn);
+      actions.appendChild(doneBtn);
+      actions.appendChild(rmBtn);
+
+      div.appendChild(num);
+      div.appendChild(info);
+      div.appendChild(actions);
+      el.appendChild(div);
+    });
+  }
+
+  function makeBtn(label, title, isDone, disabled, handler) {
+    const btn = document.createElement('button');
+    btn.className = 'q-btn' + (isDone ? ' done' : '');
+    btn.textContent = label;
+    btn.title = title;
+    btn.disabled = disabled;
+    if (!disabled) btn.onclick = handler;
+    return btn;
+  }
+
+  function move(pos, dir) {
+    const target = pos + dir;
+    if (target < 0 || target >= queue.length) return;
+    [queue[pos], queue[target]] = [queue[target], queue[pos]];
+    render();
+  }
+
+  function markDone(pos) {
+    const item = queue.splice(pos, 1)[0];
+    inQueueSet.delete(item.idx);
+    spokeSet.add(item.idx);
+    render();
+  }
+
+  function remove(pos) {
+    const item = queue.splice(pos, 1)[0];
+    inQueueSet.delete(item.idx);
+    render();
+  }
+
+  function clearQueue() {
+    if (queue.length === 0) return;
+    if (!confirm('Clear the entire speaker queue?')) return;
+    queue = [];
+    inQueueSet = new Set();
+    render();
+  }
+
+  // ── Render all ───────────────────────────────────────────────────────
+  function render() {
+    renderTabs();
+    renderMembers();
+    renderQueue();
+  }
+
+  render();
+</script>
+</body>
+</html>

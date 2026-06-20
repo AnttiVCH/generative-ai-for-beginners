@@ -116,7 +116,7 @@
       transition: all 0.12s;
       user-select: none;
     }
-    .member-btn:hover:not(.queued):not(.spoke) {
+    .member-btn:hover:not(.queued) {
       background: #4c7aef;
       border-color: #4c7aef;
       color: white;
@@ -127,13 +127,6 @@
       background: #fff8e6;
       border-color: #f0b429;
       color: #a05800;
-      cursor: default;
-    }
-    .member-btn.spoke {
-      background: #f4f4f4;
-      border-color: #ddd;
-      color: #bbb;
-      text-decoration: line-through;
       cursor: default;
     }
 
@@ -321,16 +314,15 @@
 
 <script>
   const BOARDS = {
-    'HY':       ['Mari','Sanna','Juha','Hanna','Minna','Anne','Thomas','Teemu','Aku','Sari','AnneP','Kai','Hanna','Jouni'],
-    'QMill':    ['Jussi','Pirkka','Maria','Pekka','Hannu','Mikko','Ville'],
-    'SemiQon':  ['Jussi','Patrik','Kuan','Himadri','Janne','Alberto'],
-    'Deetee':   ['Henrik','Jyrki','Marion','Richard','Amy','Hannu','Matti'],
-    'TechBoard':['Annika','Petri','Lauri','Tuula','Markku','Riitta','Eero'],
+    'HY':       ['Mari','Sanna','Juha','Hanna','Minna','Anne','Thomas','Teemu','Aku','SariL','AnneP','KaiN','HannaS','JouniH','EsaH','Other'],
+    'QMill':    ['Jussi','Pirkka','Maria','Pekka','HannuK','MikkoM','VilleK','Other'],
+    'SemiQon':  ['Jussi','Patrik','Kuan','HimadriM','JanneL','Alberto','Other'],
+    'Deetee':   ['Henrik','Jyrki','Marion','Richard','Amy','HannuM','MattiN','Other'],
+    'OnegoBio': ['PaavoS','Chris','Paavo','Tomo','Philip','MaijaI','Observer','Other'],
   };
 
   let currentBoard = Object.keys(BOARDS)[0];
   let queue = [];       // { uid, name, idx, timeStr }
-  let spokeSet = new Set();  // Set of member idx who have spoken
   let inQueueSet = new Set(); // Set of member idx currently in queue
   let uidCounter = 0;
 
@@ -358,7 +350,6 @@
   function selectBoard(name) {
     currentBoard = name;
     queue = [];
-    spokeSet = new Set();
     inQueueSet = new Set();
     uidCounter = 0;
     render();
@@ -370,12 +361,11 @@
     el.innerHTML = '';
     BOARDS[currentBoard].forEach((name, idx) => {
       const isQueued = inQueueSet.has(idx);
-      const hasspoke = spokeSet.has(idx);
       const btn = document.createElement('button');
-      btn.className = 'member-btn' + (isQueued ? ' queued' : hasspoke ? ' spoke' : '');
+      btn.className = 'member-btn' + (isQueued ? ' queued' : '');
       btn.textContent = name;
-      btn.title = isQueued ? 'In queue' : hasspoke ? 'Already spoke' : 'Add to queue';
-      if (!isQueued && !hasspoke) {
+      btn.title = isQueued ? 'In queue' : 'Add to queue';
+      if (!isQueued) {
         btn.onclick = () => addToQueue(name, idx);
       }
       el.appendChild(btn);
@@ -432,7 +422,7 @@
 
       const upBtn = makeBtn('↑', 'Move up', false, pos === 0, () => move(pos, -1));
       const dnBtn = makeBtn('↓', 'Move down', false, pos === queue.length - 1, () => move(pos, 1));
-      const doneBtn = makeBtn('✓', 'Done speaking — remove and mark as spoke', true, false, () => markDone(pos));
+      const doneBtn = makeBtn('✓', 'Done speaking — remove from queue', true, false, () => markDone(pos));
       const rmBtn = makeBtn('✕', 'Remove from queue', false, false, () => remove(pos));
       rmBtn.classList.add('remove');
 
@@ -468,7 +458,6 @@
   function markDone(pos) {
     const item = queue.splice(pos, 1)[0];
     inQueueSet.delete(item.idx);
-    spokeSet.add(item.idx);
     render();
   }
 
